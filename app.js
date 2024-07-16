@@ -3,10 +3,12 @@ const path = require("path");
 
 const ejsMate = require("ejs-mate");
 const catchAsync = require("./utils/catchAsync");
+const ExpressError = require("./utils/ExpressError");
 const mongoose = require("mongoose");
 const Campground = require("./models/campground");
 
 const methodOverride = require("method-override");
+const { error } = require("console");
 
 mongoose.connect("mongodb://localhost:27017/yelp-camp", {
   useNewUrlParser: true,
@@ -44,6 +46,8 @@ app.get("/campgrounds/new", (req, res) => {
 app.post(
   "/campgrounds",
   catchAsync(async (req, res) => {
+    if (!req.body.campground)
+      throw new ExpressError("invalid campground data", 400);
     const campground = new Campground(req.body.campground);
     await campground.save();
     res.redirect(`/campgrounds/${campground._id}`);
@@ -84,8 +88,13 @@ app.delete(
     res.redirect("/campgrounds");
   })
 );
+app.all("*", (req, res, next) => {
+  next(new ExpressError("page not found", 404));
+});
 app.use((err, req, res, next) => {
-  res.send("oh boy, something went wrong!");
+  const { statusCode = 500 } = err;
+  if (!err.message) err.message = "oh no Something went wrong!";
+  res.status(statusCode).render("error", { err });
 });
 app.listen(3000, () => {
   console.log("Serving on port 3000");
